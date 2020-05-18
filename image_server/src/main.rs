@@ -7,7 +7,6 @@ use actix_multipart::Multipart;
 use actix_web::client::Client;
 
 use futures::TryStreamExt;
-use tokio::task::spawn_local;
 
 mod models;
 mod utils;
@@ -24,11 +23,8 @@ async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, Erro
         let (image_path, preview_path) = utils::generate_file_names();
         let image_path_clone = image_path.clone();
         let preview_path_clone = preview_path.clone();
-        spawn_local(async move {
-            let _ =
-                web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone))
-                    .await;
-        });
+        utils::save_image(body[..].into(), image_path_clone, preview_path_clone).await;
+        
         return Ok(HttpResponse::Ok().json(models::ImageUrl {
             url: image_path[1..].to_string(),
             preview_url: preview_path[1..].to_string(),
@@ -41,12 +37,7 @@ async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, Erro
                 let (image_path, preview_path) = utils::generate_file_names();
                 let image_path_clone = image_path.clone();
                 let preview_path_clone = preview_path.clone();
-                spawn_local(async move {
-                    let _ = web::block(move || {
-                        utils::save_image(&body, image_path_clone, preview_path_clone)
-                    })
-                    .await;
-                });
+                utils::save_image(body[..].into(), image_path_clone, preview_path_clone).await;
                 images.push(models::ImageUrl {
                     preview_url: preview_path[1..].to_string(),
                     url: image_path[1..].to_string(),
@@ -65,11 +56,7 @@ async fn images(mut payload: Multipart) -> Result<HttpResponse, Error> {
         let (image_path, preview_path) = utils::generate_file_names();
         let image_path_clone = image_path.clone();
         let preview_path_clone = preview_path.clone();
-        spawn_local(async move {
-            let _ =
-                web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone))
-                    .await;
-        });
+        utils::save_image(body, image_path_clone, preview_path_clone).await;
         images.push(models::ImageUrl {
             preview_url: preview_path[1..].to_string(),
             url: image_path[1..].to_string(),
