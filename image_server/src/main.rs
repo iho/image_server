@@ -1,25 +1,15 @@
-#![feature(async_closure)]
-
 extern crate base64;
 extern crate bytes;
-// use std::collections::HashMap;
 
-
-use actix_web::{
- guard, http, web, App, Error, HttpRequest, HttpResponse, HttpServer,
-};
+use actix_web::{guard, http, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 
 use actix_multipart::Multipart;
 use actix_web::client::Client;
-use std::io::Write;
 
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 
-mod utils;
 mod models;
-
-// use crate::utils::save_image;
-// use crate::utils::generate_file_names;
+mod utils;
 
 async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, Error> {
     if let Some(url) = &data.url {
@@ -29,43 +19,33 @@ async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, Erro
             .header("User-Agent", "Actix-web")
             .send()
             .await?;
-        let body = response.body().await?; 
+        let body = response.body().await?;
         let (image_path, preview_path) = utils::generate_file_names();
         let image_path_clone = image_path.clone();
-        let preview_path_clone = image_path.clone();
-        web::block(move || {
-            utils::save_image(&body, image_path_clone, preview_path_clone)
-        })
-        .await?;
-        return Ok(HttpResponse::Ok().json(models::ImageUrl{
+        let preview_path_clone = preview_path.clone();
+        web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone)).await?;
+        return Ok(HttpResponse::Ok().json(models::ImageUrl {
             url: image_path,
-            preview_url: preview_path
-        }))
+            preview_url: preview_path,
+        }));
     }
 
     Ok(HttpResponse::Ok().into())
 }
 async fn images(req: HttpRequest, mut payload: Multipart) -> Result<HttpResponse, Error> {
-    dbg!(req);
-
+    let mut images: Vec<models::ImageUrl> = Vec::new();
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_type = field.content_disposition().unwrap();
-        let filename = content_type.get_filename().unwrap();
-        println!("{}", filename);
-        let filepath = format!("./upload/{}", filename);
-        // File::create is blocking operation, use threadpool
-        let mut f = web::block(|| std::fs::File::create(filepath))
-            .await
-            .unwrap();
-        // Field in turn is stream of *Bytes* object
-        while let Some(chunk) = field.next().await {
-            let data = chunk.unwrap();
-            // filesystem operations are blocking, we have to use threadpool
-            f = web::block(move || f.write_all(&data).map(|_| f)).await?;
-        }
+        let body = utils::get_whole_field(&mut field).await;
+        let (image_path, preview_path) = utils::generate_file_names();
+        let image_path_clone = image_path.clone();
+        let preview_path_clone = preview_path.clone();
+        web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone)).await?;
+        images.push(models::ImageUrl {
+            preview_url: preview_path[1..].to_string(),
+            url: image_path[1..].to_string(),
+        })
     }
-
-    Ok(HttpResponse::Ok().into())
+    return Ok(HttpResponse::Ok().json(models::ImageUrls { images: images }));
 }
 
 #[actix_rt::main]
@@ -98,9 +78,3 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
-
-// fn main() {
-//     let  img = image::open("./upload/new.jpeg").unwrap();
-//     let thumbnail = img.resize(120, 120, FilterType::Lanczos3);
-//     let _ = thumbnail.save("out.png" ).ok().expect("Saving image failed");
-// }

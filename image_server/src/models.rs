@@ -1,6 +1,5 @@
 use serde_derive::{Deserialize, Serialize};
 
-
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Data {
     pub url: Option<String>,
@@ -15,5 +14,5 @@ pub struct ImageUrl {
 }
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ImageUrls {
-    pub images: Vec<ImageUrl>
+    pub images: Vec<ImageUrl>,
 }
