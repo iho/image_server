@@ -7,4 +7,19 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rocket = "0.4.4"
+# tokio = { version = "0.2", features = ["full"] }
+# warp = "0.2.2"
+actix-web = {version = "2.0", features = ["openssl"]}
+actix-http = {version = "1.0.1" }
+actix-rt = "1"
+actix-multipart = "0.2.0"
+async-std = { version = "1.5.0", features = ["attributes"] }
+futures = { version = "0.3.5"}
+futures-util = { version = "0.3.5"}
+serde_derive = "1.0.110"
+serde_json = { version = "1.0.53"}
+serde = { version = "1.0.110", features = ["derive"] }
+bytes = { version = "0.5.4"}
+base64 = { version = "0.12.1"}
+image = { version = "0.23.4"}
+uuid = {version = "0.8.1", features = ["v4"]}
