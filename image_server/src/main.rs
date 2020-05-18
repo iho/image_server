@@ -7,6 +7,7 @@ use actix_multipart::Multipart;
 use actix_web::client::Client;
 
 use futures::TryStreamExt;
+use tokio::task::spawn_local;
 
 mod models;
 mod utils;
@@ -23,23 +24,27 @@ async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, Erro
         let (image_path, preview_path) = utils::generate_file_names();
         let image_path_clone = image_path.clone();
         let preview_path_clone = preview_path.clone();
-        web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone)).await?;
+        spawn_local(async move {
+            let _ = web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone)).await;    
+        });
         return Ok(HttpResponse::Ok().json(models::ImageUrl {
-            url: image_path,
-            preview_url: preview_path,
+            url: image_path[1..].to_string(),
+            preview_url: preview_path[1..].to_string(),
         }));
     }
 
     Ok(HttpResponse::Ok().into())
 }
-async fn images(req: HttpRequest, mut payload: Multipart) -> Result<HttpResponse, Error> {
+async fn images(mut payload: Multipart) -> Result<HttpResponse, Error> {
     let mut images: Vec<models::ImageUrl> = Vec::new();
     while let Ok(Some(mut field)) = payload.try_next().await {
         let body = utils::get_whole_field(&mut field).await;
         let (image_path, preview_path) = utils::generate_file_names();
         let image_path_clone = image_path.clone();
         let preview_path_clone = preview_path.clone();
-        web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone)).await?;
+        spawn_local(async move {
+            let _ = web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone)).await;    
+        });
         images.push(models::ImageUrl {
             preview_url: preview_path[1..].to_string(),
             url: image_path[1..].to_string(),
