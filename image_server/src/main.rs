@@ -11,6 +11,9 @@ use futures::TryStreamExt;
 mod models;
 mod utils;
 
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, Error> {
     if let Some(url) = &data.url {
         let client = Client::default();
@@ -24,7 +27,6 @@ async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, Erro
         let image_path_clone = image_path.clone();
         let preview_path_clone = preview_path.clone();
         utils::save_image(body[..].into(), image_path_clone, preview_path_clone).await;
-        
         return Ok(HttpResponse::Ok().json(models::ImageUrl {
             url: image_path[1..].to_string(),
             preview_url: preview_path[1..].to_string(),

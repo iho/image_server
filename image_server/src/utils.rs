@@ -1,13 +1,12 @@
 extern crate image;
 extern crate uuid;
 use actix_multipart::Field;
+use actix_web::web;
 use bytes::BytesMut;
 use futures::StreamExt;
 use image::imageops::FilterType;
-use uuid::Uuid;
 use tokio::task::spawn_local;
-use actix_web::{web};
-
+use uuid::Uuid;
 
 const UPLOAD_DIR: &str = "./uploads/";
 
@@ -20,27 +19,17 @@ pub fn generate_file_names() -> (String, String) {
     );
 }
 
-pub async fn save_image(
-    body: bytes::BytesMut,
-    image_path: String,
-    preview_path: String,
-)  {
+pub async fn save_image(body: bytes::BytesMut, image_path: String, preview_path: String) {
     spawn_local(async move {
-        let _ =
-            web::block(move || {
-                let img = image::load_from_memory(&body)?;
-                img.save(image_path)?;
-                
-                let thumbnail = img.resize(120, 120, FilterType::Lanczos3);
-                let result = thumbnail.save(preview_path);
-                drop(body);
-                drop(img);
-                drop(thumbnail);
-                result
-            })
-                .await;
+        let _ = web::block(move || {
+            let img = image::load_from_memory(&body)?;
+            img.save(image_path)?;
+            let thumbnail = img.resize(120, 120, FilterType::Lanczos3);
+            let result = thumbnail.save(preview_path);
+            result
+        })
+        .await;
     });
-    
 }
 
 pub async fn get_whole_field(field: &mut Field) -> BytesMut {
