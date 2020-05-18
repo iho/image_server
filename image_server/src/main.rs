@@ -1,7 +1,7 @@
 extern crate base64;
 extern crate bytes;
 
-use actix_web::{guard, http, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{guard, http, web, App, Error, FromRequest, HttpResponse, HttpServer};
 
 use actix_multipart::Multipart;
 use actix_web::client::Client;
@@ -25,15 +25,38 @@ async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, Erro
         let image_path_clone = image_path.clone();
         let preview_path_clone = preview_path.clone();
         spawn_local(async move {
-            let _ = web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone)).await;    
+            let _ =
+                web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone))
+                    .await;
         });
         return Ok(HttpResponse::Ok().json(models::ImageUrl {
             url: image_path[1..].to_string(),
             preview_url: preview_path[1..].to_string(),
         }));
     }
+    if let Some(files) = &data.files {
+        let mut images: Vec<models::ImageUrl> = Vec::new();
+        for file in files.iter() {
+            if let Ok(body) = base64::decode(file) {
+                let (image_path, preview_path) = utils::generate_file_names();
+                let image_path_clone = image_path.clone();
+                let preview_path_clone = preview_path.clone();
+                spawn_local(async move {
+                    let _ = web::block(move || {
+                        utils::save_image(&body, image_path_clone, preview_path_clone)
+                    })
+                    .await;
+                });
+                images.push(models::ImageUrl {
+                    preview_url: preview_path[1..].to_string(),
+                    url: image_path[1..].to_string(),
+                })
+            }
+        }
+        return Ok(HttpResponse::Ok().json(models::ImageUrls { images: images }));
+    }
 
-    Ok(HttpResponse::Ok().into())
+    Ok(HttpResponse::BadRequest().into())
 }
 async fn images(mut payload: Multipart) -> Result<HttpResponse, Error> {
     let mut images: Vec<models::ImageUrl> = Vec::new();
@@ -43,7 +66,9 @@ async fn images(mut payload: Multipart) -> Result<HttpResponse, Error> {
         let image_path_clone = image_path.clone();
         let preview_path_clone = preview_path.clone();
         spawn_local(async move {
-            let _ = web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone)).await;    
+            let _ =
+                web::block(move || utils::save_image(&body, image_path_clone, preview_path_clone))
+                    .await;
         });
         images.push(models::ImageUrl {
             preview_url: preview_path[1..].to_string(),
@@ -58,6 +83,9 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new().service(
             web::resource("/images")
+                .app_data(web::Json::<models::Data>::configure(|cfg| {
+                    cfg.limit(16 * 1024 * 1024)
+                }))
                 .route(
                     web::route()
                         .guard(guard::fn_guard(|head| {
