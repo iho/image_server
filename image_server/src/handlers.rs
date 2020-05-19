@@ -66,8 +66,8 @@ mod tests {
     use super::*;
 
     use actix_web::http::header::HeaderMap;
-    use actix_web::http::{header, StatusCode};
-    use actix_web::{test, HttpMessage, HttpRequest, HttpResponse};
+    use actix_web::http::{StatusCode};
+    use actix_web::{test};
     use bytes;
     use futures::prelude::*; // 0.3.1
     use futures::stream::StreamExt;
