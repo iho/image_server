@@ -7,4 +7,4 @@ RUN cargo build
 COPY ./image_server .
 RUN cargo build --release 
 
-CMD ["./target/release/image_server"]
+ENTRYPOINT ./target/release/image_server

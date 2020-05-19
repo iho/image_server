@@ -1,71 +1,14 @@
 extern crate base64;
 extern crate bytes;
 
-use actix_web::{guard, http, web, App, Error, FromRequest, HttpResponse, HttpServer};
+use actix_web::{guard, http, web, App, FromRequest, HttpServer};
 
-use actix_multipart::Multipart;
-use actix_web::client::Client;
-
-use futures::TryStreamExt;
-
+mod handlers;
 mod models;
-mod utils;
+pub mod utils;
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
-async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, Error> {
-    if let Some(url) = &data.url {
-        let client = Client::default();
-        let mut response = client
-            .get(url)
-            .header("User-Agent", "Actix-web")
-            .send()
-            .await?;
-        let body = response.body().await?;
-        let (image_path, preview_path) = utils::generate_file_names();
-        let image_path_clone = image_path.clone();
-        let preview_path_clone = preview_path.clone();
-        utils::save_image(body[..].into(), image_path_clone, preview_path_clone).await;
-        return Ok(HttpResponse::Ok().json(models::ImageUrl {
-            url: image_path[1..].to_string(),
-            preview_url: preview_path[1..].to_string(),
-        }));
-    }
-    if let Some(files) = &data.files {
-        let mut images: Vec<models::ImageUrl> = Vec::new();
-        for file in files.iter() {
-            if let Ok(body) = base64::decode(file) {
-                let (image_path, preview_path) = utils::generate_file_names();
-                let image_path_clone = image_path.clone();
-                let preview_path_clone = preview_path.clone();
-                utils::save_image(body[..].into(), image_path_clone, preview_path_clone).await;
-                images.push(models::ImageUrl {
-                    preview_url: preview_path[1..].to_string(),
-                    url: image_path[1..].to_string(),
-                })
-            }
-        }
-        return Ok(HttpResponse::Ok().json(models::ImageUrls { images: images }));
-    }
-
-    Ok(HttpResponse::BadRequest().into())
-}
-async fn images(mut payload: Multipart) -> Result<HttpResponse, Error> {
-    let mut images: Vec<models::ImageUrl> = Vec::new();
-    while let Ok(Some(mut field)) = payload.try_next().await {
-        let body = utils::get_whole_field(&mut field).await;
-        let (image_path, preview_path) = utils::generate_file_names();
-        let image_path_clone = image_path.clone();
-        let preview_path_clone = preview_path.clone();
-        utils::save_image(body, image_path_clone, preview_path_clone).await;
-        images.push(models::ImageUrl {
-            preview_url: preview_path[1..].to_string(),
-            url: image_path[1..].to_string(),
-        })
-    }
-    return Ok(HttpResponse::Ok().json(models::ImageUrls { images: images }));
-}
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
@@ -87,12 +30,12 @@ async fn main() -> std::io::Result<()> {
                                 false
                             }
                         }))
-                        .to(images),
+                        .to(handlers::images),
                 )
                 .route(
                     web::route()
                         .guard(guard::Header("content-type", "application/json"))
-                        .to(images_json),
+                        .to(handlers::images_json),
                 ),
         )
     })

@@ -25,7 +25,7 @@ pub async fn save_image(body: bytes::BytesMut, image_path: String, preview_path:
             let img = image::load_from_memory(&body)?;
             img.save(image_path)?;
             let thumbnail = img.resize(120, 120, FilterType::Lanczos3);
-             thumbnail.save(preview_path)
+            thumbnail.save(preview_path)
         })
         .await;
     });
