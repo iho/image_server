@@ -42,7 +42,7 @@ pub async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, 
         if images.is_empty() {
             return Ok(HttpResponse::BadRequest().into());
         }
-        return Ok(HttpResponse::Ok().json(models::ImageUrls { images: images }));
+        return Ok(HttpResponse::Ok().json(models::ImageUrls { images }));
     }
 
     Ok(HttpResponse::BadRequest().into())
@@ -81,8 +81,8 @@ mod tests {
     use actix_web::error::PayloadError;
     use actix_web::{http, web};
     use bytes::Bytes;
-    use tokio::time;
     use std::time::Duration;
+    use tokio::time;
 
     #[actix_rt::test]
     async fn test_images_json_url() {
@@ -114,7 +114,7 @@ mod tests {
                     ]),
                 });
                 let resp = images_json(req).await.unwrap();
-                
+
                 time::delay_for(Duration::from_millis(5000)).await;
                 assert_eq!(resp.status(), http::StatusCode::OK);
             }
@@ -144,9 +144,7 @@ mod tests {
         let (sender, payload) = create_stream();
 
         if let Ok(task) = contents {
-            sender
-                .send(Ok(Bytes::from(task)))
-                .unwrap();
+            sender.send(Ok(Bytes::from(task))).unwrap();
             let multipart = Multipart::new(&headers, payload);
             let resp = images(multipart).await.unwrap();
             time::delay_for(Duration::from_millis(5000)).await;
