@@ -39,7 +39,7 @@ pub async fn images_json(data: web::Json<models::Data>) -> Result<HttpResponse, 
                 })
             }
         }
-        if images.len() == 0 {
+        if images.is_empty() {
             return Ok(HttpResponse::BadRequest().into());
         }
         return Ok(HttpResponse::Ok().json(models::ImageUrls { images: images }));
@@ -60,10 +60,10 @@ pub async fn images(mut payload: Multipart) -> Result<HttpResponse, Error> {
             url: image_path[1..].to_string(),
         })
     }
-    if images.len() == 0 {
+    if images.is_empty() {
         return Ok(HttpResponse::BadRequest().into());
     }
-    Ok(HttpResponse::Ok().json(models::ImageUrls { images: images }))
+    Ok(HttpResponse::Ok().json(models::ImageUrls { images }))
 }
 
 #[cfg(test)]
@@ -71,9 +71,7 @@ pub async fn images(mut payload: Multipart) -> Result<HttpResponse, Error> {
 mod tests {
     use super::*;
 
-    use actix_web::http::header::HeaderMap;
     use actix_web::http::StatusCode;
-    use actix_web::test;
     use bytes;
     use futures::prelude::*; // 0.3.1
     use futures::stream::StreamExt;
@@ -81,28 +79,23 @@ mod tests {
 
     use actix_utils::mpsc;
     use actix_web::error::PayloadError;
+    use actix_web::{http, web};
     use bytes::Bytes;
-
-    use actix_web::dev::Service;
-    use actix_web::{http, web, App};
+    use tokio::time;
+    use std::time::Duration;
 
     #[actix_rt::test]
     async fn test_images_json_url() {
         let url =
             "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png"
                 .to_string();
-        let mut app = test::init_service(
-            App::new().service(web::resource("/").route(web::post().to(images_json))),
-        )
-        .await;
-        let req = test::TestRequest::post()
-            .uri("/")
-            .set_json(&models::Data {
-                url: Some(url),
-                files: None,
-            })
-            .to_request();
-        let resp = app.call(req).await.unwrap();
+
+        let req = web::Json(models::Data {
+            url: Some(url),
+            files: None,
+        });
+        let resp = images_json(req).await.unwrap();
+        time::delay_for(Duration::from_millis(1000)).await;
         assert_eq!(resp.status(), http::StatusCode::OK);
     }
 
@@ -110,23 +103,19 @@ mod tests {
     async fn test_images_json_base64files() {
         let contents = fs::read("./images/photo-1438007139926-e36a66651100.jpeg").await;
         let contents_of_file2 = fs::read("./images/photo-1495302075642-6f890b162813.jpeg").await;
-        let mut app = test::init_service(
-            App::new().service(web::resource("/").route(web::post().to(images_json))),
-        )
-        .await;
+
         if let Ok(contents) = contents {
             if let Ok(contents_of_file2) = contents_of_file2 {
-                let req = test::TestRequest::post()
-                    .uri("/")
-                    .set_json(&models::Data {
-                        url: None,
-                        files: Some(vec![
-                            base64::encode(contents),
-                            base64::encode(contents_of_file2),
-                        ]),
-                    })
-                    .to_request();
-                let resp = app.call(req).await.unwrap();
+                let req = web::Json(models::Data {
+                    url: None,
+                    files: Some(vec![
+                        base64::encode(contents),
+                        base64::encode(contents_of_file2),
+                    ]),
+                });
+                let resp = images_json(req).await.unwrap();
+                
+                time::delay_for(Duration::from_millis(1000)).await;
                 assert_eq!(resp.status(), http::StatusCode::OK);
             }
         }
@@ -143,12 +132,29 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_images() {
-        let headers = HeaderMap::new();
+        let mut headers = HeaderMap::new();
+        use actix_web::http::header::{self, HeaderMap};
+
+        
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_static(
+                "multipart/mixed; boundary=\"abbc761f78ff4d7cb7573b5a23f96ef0\"",
+            ),
+        );
         let contents = fs::read("./images/photo-1438007139926-e36a66651100.jpeg").await;
         let (sender, payload) = create_stream();
 
         if let Ok(task) = contents {
-            sender.send(Ok(Bytes::from(task))).unwrap();
+            let task_string = base64::encode(task);
+            sender
+                .send(Ok(Bytes::from(format!("abbc761f78ff4d7cb7573b5a23f96ef0\r\n\
+                Content-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\n\r\n\
+                
+                {}\r\n\
+                abbc761f78ff4d7cb7573b5a23f96ef0\r\n", task_string.len().to_string(), task_string))))
+                .unwrap();
             let multipart = Multipart::new(&headers, payload);
             let resp = images(multipart).await.unwrap();
             assert_eq!(resp.status(), StatusCode::OK);

@@ -13,10 +13,10 @@ const UPLOAD_DIR: &str = "./uploads/";
 pub fn generate_file_names() -> (String, String) {
     let uuid = Uuid::new_v4();
     let name = uuid.to_hyphenated_ref();
-    return (
+    (
         format!("{}{}.jpeg", UPLOAD_DIR, name),
         format!("{}{}_preview.jpeg", UPLOAD_DIR, name),
-    );
+    )
 }
 
 pub async fn save_image(body: bytes::BytesMut, image_path: String, preview_path: String) {
