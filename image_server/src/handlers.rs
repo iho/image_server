@@ -95,7 +95,7 @@ mod tests {
             files: None,
         });
         let resp = images_json(req).await.unwrap();
-        time::delay_for(Duration::from_millis(1000)).await;
+        time::delay_for(Duration::from_millis(5000)).await;
         assert_eq!(resp.status(), http::StatusCode::OK);
     }
 
@@ -115,7 +115,7 @@ mod tests {
                 });
                 let resp = images_json(req).await.unwrap();
                 
-                time::delay_for(Duration::from_millis(1000)).await;
+                time::delay_for(Duration::from_millis(5000)).await;
                 assert_eq!(resp.status(), http::StatusCode::OK);
             }
         }
@@ -132,31 +132,24 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_images() {
-        let mut headers = HeaderMap::new();
         use actix_web::http::header::{self, HeaderMap};
-
-        
         let mut headers = HeaderMap::new();
         headers.insert(
             header::CONTENT_TYPE,
             header::HeaderValue::from_static(
-                "multipart/mixed; boundary=\"abbc761f78ff4d7cb7573b5a23f96ef0\"",
+                "multipart/mixed; boundary=\"6cbe132b97ae69dc2aaf6eeffd7ca9f0\"",
             ),
         );
-        let contents = fs::read("./images/photo-1438007139926-e36a66651100.jpeg").await;
+        let contents = fs::read("./images/test.body").await;
         let (sender, payload) = create_stream();
 
         if let Ok(task) = contents {
-            let task_string = base64::encode(task);
             sender
-                .send(Ok(Bytes::from(format!("abbc761f78ff4d7cb7573b5a23f96ef0\r\n\
-                Content-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\n\r\n\
-                
-                {}\r\n\
-                abbc761f78ff4d7cb7573b5a23f96ef0\r\n", task_string.len().to_string(), task_string))))
+                .send(Ok(Bytes::from(task)))
                 .unwrap();
             let multipart = Multipart::new(&headers, payload);
             let resp = images(multipart).await.unwrap();
+            time::delay_for(Duration::from_millis(5000)).await;
             assert_eq!(resp.status(), StatusCode::OK);
         }
     }
